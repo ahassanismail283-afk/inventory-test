@@ -18,3 +18,6 @@ jobs:
           firebaseServiceAccount: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_VET_INVENTORY_APP }}
           channelId: live
           projectId: vet-inventory-app
+          env:
+          VITE_SUPABASE_URL: ${{ https://eaqiboydvjbhulzxrqjg.supabase.co }}
+          VITE_SUPABASE_ANON_KEY: ${{ sb_publishable_MzfWovfWcFgAdFV2sy3VRA_ULKQBwiM }}
