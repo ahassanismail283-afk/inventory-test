@@ -140,6 +140,28 @@ export function useInventory() {
     }
   };
 
+  const deleteItem = async (itemId: string) => {
+    setLoading(true);
+    try {
+      // First delete associated transactions to avoid foreign key constraint errors
+      const { error: txError } = await supabase.from('transactions').delete().eq('itemId', itemId);
+      if (txError) throw txError;
+
+      // Then delete the item itself
+      const { error: itemError } = await supabase.from('items').delete().eq('id', itemId);
+      if (itemError) throw itemError;
+
+      toast.success('تم حذف الصنف بنجاح');
+      await fetchItems();
+      await fetchTransactions();
+    } catch (err: any) {
+      console.error(err);
+      toast.error('حدث خطأ أثناء حذف الصنف: ' + err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const editTransaction = async (
     txId: string, 
     updates: { type: 'إضافة' | 'استهلاك', quantity: number, date: string }
@@ -187,6 +209,7 @@ export function useInventory() {
     addTransaction,
     deleteTransaction,
     editTransaction,
-    fetchItems
+    fetchItems,
+    deleteItem
   };
 }

@@ -17,28 +17,30 @@ const WeeklyReport: React.FC = () => {
   const activeLocation = locations.find(l => l.id === activeLocationId);
 
   const reportData = useMemo(() => {
-    // 1. Filter consumptions in date range
-    const weekConsumptions = transactions.filter(t => {
+    // 1. Find all transactions in the date range
+    const weekTransactions = transactions.filter(t => {
       const txDate = parseISO(t.date);
-      return t.type === 'استهلاك' && isWithinInterval(txDate, { start: startDate, end: endDate });
+      return isWithinInterval(txDate, { start: startDate, end: endDate });
     });
 
-    // 2. Sum by item Id
+    // Extract ones that are specifically Consumptions
+    const weekConsumptions = weekTransactions.filter(t => t.type === 'استهلاك');
+
+    // 2. Sum consumptions by item Id
     const consumptionMap: Record<string, number> = {};
     weekConsumptions.forEach(t => {
       consumptionMap[t.itemId] = (consumptionMap[t.itemId] || 0) + t.quantity;
     });
 
-    // 3. Map to items and filter
+    // 3. Map to items and filter for consumptions only
     const report = items
-      .filter(item => item.currentQuantity > 0) // Hide items with 0 current stock per req
       .map(item => ({
         id: item.id,
         name: item.name,
         currentStock: item.currentQuantity,
         consumption: consumptionMap[item.id] || 0
       }))
-      .filter(row => row.consumption > 0 || row.currentStock > 0);
+      .filter(row => row.consumption > 0);
 
     return report;
   }, [items, transactions, startDate, endDate]);

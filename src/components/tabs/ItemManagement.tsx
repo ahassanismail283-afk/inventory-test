@@ -3,10 +3,10 @@ import { useInventory } from '../../hooks/useInventory';
 import { useAuth } from '../../contexts/AuthContext';
 import { supabase } from '../../lib/supabase';
 import { toast } from 'react-hot-toast';
-import { Package, Plus } from 'lucide-react';
+import { Package, Plus, Trash2 } from 'lucide-react';
 
 const ItemManagement: React.FC = () => {
-  const { items, fetchItems, loading } = useInventory();
+  const { items, fetchItems, loading, deleteItem } = useInventory();
   const { activeLocationId } = useAuth();
   
   const [newItemName, setNewItemName] = useState('');
@@ -65,6 +65,12 @@ const ItemManagement: React.FC = () => {
       toast.error('فشل في إضافة الصنف: ' + err.message);
     } finally {
       setIsImporting(false);
+    }
+  };
+
+  const handleDeleteItem = async (itemId: string, itemName: string) => {
+    if (window.confirm(`هل أنت متأكد من رغبتك في حذف الصنف "${itemName}"؟\nسيتم أيضاً حذف جميع الحركات المرتبطة بهذا الصنف!`)) {
+      await deleteItem(itemId);
     }
   };
 
@@ -133,10 +139,11 @@ const ItemManagement: React.FC = () => {
                <div className="text-center py-12 text-slate-500 bg-white/50 rounded-xl font-medium">لا توجد أصناف في هذا الموقع بعد.</div>
             ) : (
               <table className="w-full min-w-[500px] text-right">
-                <thead>
+                 <thead>
                   <tr className="bg-slate-50/50 text-sm text-slate-500 uppercase tracking-wider">
                      <th className="py-4 px-6 font-semibold">الصنف</th>
-                     <th className="py-4 px-6 font-semibold text-center rounded-tl-xl">الرصيد الحالي</th>
+                     <th className="py-4 px-6 font-semibold text-center">الرصيد الحالي</th>
+                     <th className="py-4 px-6 font-semibold text-center rounded-tl-xl w-24">إجراءات</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100/50">
@@ -147,6 +154,15 @@ const ItemManagement: React.FC = () => {
                         <span className={`inline-flex items-center justify-center min-w-[3rem] px-3 py-1 rounded-full text-sm font-bold tracking-wide ${item.currentQuantity <= 0 ? 'bg-red-50 text-red-700' : 'bg-primary-50 text-primary-700'}`}>
                           {item.currentQuantity}
                         </span>
+                      </td>
+                      <td className="py-4 px-6 text-center">
+                        <button
+                          onClick={() => handleDeleteItem(item.id, item.name)}
+                          className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
+                          title="حذف الصنف"
+                        >
+                          <Trash2 className="h-5 w-5 mx-auto" />
+                        </button>
                       </td>
                     </tr>
                   ))}
