@@ -6,6 +6,13 @@
   body {
     @apply bg-[#f3f5fa] text-slate-900 antialiased;
   }
+
+  /* The page itself never scrolls sideways on a phone; wide tables scroll inside their own box.
+     `clip` (not `hidden`) keeps sticky and fixed positioning working. */
+  html,
+  body {
+    overflow-x: clip;
+  }
 }
 
 @media print {

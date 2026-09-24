@@ -231,7 +231,7 @@ const UserManagement: React.FC = () => {
 
       <Card className="overflow-hidden">
         <CardTitle aside={<span className="text-sm text-slate-600">{users.length} مستخدم</span>}>الحسابات الحالية</CardTitle>
-        <div className="overflow-x-auto">
+        <div className="relative overflow-x-auto">
           {loading && users.length === 0 ? (
             <TableSkeleton rows={4} cols={3} />
           ) : users.length === 0 ? (

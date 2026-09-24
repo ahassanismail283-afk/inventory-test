@@ -242,7 +242,7 @@ const TransactionHistory: React.FC = () => {
             />
           </div>
 
-          <div className="overflow-x-auto rounded-b-xl">
+          <div className="relative overflow-x-auto rounded-b-xl">
             {loading ? (
               <TableSkeleton rows={6} cols={4} />
             ) : filteredTransactions.length === 0 ? (

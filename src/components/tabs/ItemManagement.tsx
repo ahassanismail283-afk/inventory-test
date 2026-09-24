@@ -142,7 +142,7 @@ const ItemManagement: React.FC = () => {
             الأصناف الحالية
           </CardTitle>
 
-          <div className="overflow-x-auto">
+          <div className="relative overflow-x-auto">
             {loading ? (
               <TableSkeleton rows={6} cols={2} />
             ) : items.length === 0 ? (

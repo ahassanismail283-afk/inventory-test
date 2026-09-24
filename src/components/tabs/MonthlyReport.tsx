@@ -81,7 +81,7 @@ const MonthlyReport: React.FC = () => {
           </div>
         </div>
 
-        <div className="overflow-x-auto print:overflow-visible">
+        <div className="relative overflow-x-auto print:overflow-visible">
           {!hasValidRange ? (
             <div className="no-print">
               <EmptyState

@@ -73,7 +73,7 @@ const WeeklyReport: React.FC = () => {
           </div>
         </div>
 
-        <div className="overflow-x-auto print:overflow-visible">
+        <div className="relative overflow-x-auto print:overflow-visible">
           {reportData.length === 0 ? (
             <div className="no-print">
               <EmptyState icon={CalendarDays} title="لا يوجد منصرف في هذا الأسبوع" hint="اختر يوما من أسبوع آخر، أو سجّل المنصرف من شاشة إضافة حركة." />
