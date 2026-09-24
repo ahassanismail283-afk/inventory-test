@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { supabase } from '../lib/supabase';
 import { Stethoscope } from 'lucide-react';
 import { toast } from 'react-hot-toast';
+import { Field, inputClass, buttonClass } from './ui';
 
 interface LoginProps {
   isRecoveryMode?: boolean;
@@ -42,77 +43,83 @@ const Login: React.FC<LoginProps> = ({ isRecoveryMode = false }) => {
     }
   };
 
+  const title =
+    mode === 'login' ? 'تسجيل الدخول' : mode === 'forgot' ? 'استعادة كلمة المرور' : 'كلمة مرور جديدة';
+
   return (
-    <div className="flex min-h-screen items-center justify-center bg-slate-50 p-4">
-      <div className="w-full max-w-md rounded-2xl bg-white p-8 shadow-xl">
-        <div className="mb-8 flex flex-col items-center">
-          <div className="mb-4 rounded-full bg-primary-100 p-4">
-            <Stethoscope className="h-10 w-10 text-primary-600" />
+    <div className="relative flex min-h-[100dvh] items-center justify-center overflow-hidden bg-primary-900 px-4 py-10">
+      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_left,rgba(36,70,214,0.9),transparent_60%)]" aria-hidden="true" />
+      <div className="absolute -bottom-40 -right-32 h-96 w-96 rounded-full bg-primary-500/30 blur-3xl" aria-hidden="true" />
+      <div className="relative w-full max-w-sm">
+        <div className="mb-6 flex items-center gap-3">
+          <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white text-primary-700 shadow-sm">
+            <Stethoscope className="h-6 w-6" strokeWidth={1.75} />
           </div>
-          <h1 className="text-2xl font-bold text-slate-900">وحدة جزيرة شندويل البيطرية</h1>
-          <p className="mt-2 text-sm text-slate-500">
-            {mode === 'login' && 'منظومة إدارة المخزون والصرف'}
-            {mode === 'forgot' && 'استعادة كلمة المرور'}
-            {mode === 'reset' && 'إعداد كلمة مرور جديدة'}
-          </p>
+          <div className="leading-tight">
+            <p className="font-semibold text-white">وحدة جزيرة شندويل البيطرية</p>
+            <p className="text-sm text-primary-200">منظومة إدارة المخزون والصرف</p>
+          </div>
         </div>
 
-        <form onSubmit={handleAuth} className="space-y-6">
-          {(mode === 'login' || mode === 'forgot') && (
-            <div>
-              <label className="block text-sm font-medium text-slate-700">البريد الإلكتروني</label>
-              <input
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                className="mt-1 block w-full rounded-lg border border-slate-300 px-4 py-3 focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500"
-                placeholder="admin@vet.com"
-                required
-              />
-            </div>
+        <div className="rounded-2xl bg-white p-6 shadow-2xl shadow-primary-950/40 sm:p-8">
+          <h1 className="text-2xl font-semibold text-slate-900">{title}</h1>
+          {mode === 'forgot' && (
+            <p className="mt-1 text-sm text-slate-600">أدخل بريدك وسنرسل لك رابطا لتعيين كلمة مرور جديدة.</p>
           )}
 
-          {(mode === 'login' || mode === 'reset') && (
-            <div>
-              <label className="block text-sm font-medium text-slate-700">
-                {mode === 'reset' ? 'كلمة المرور الجديدة' : 'كلمة المرور'}
-              </label>
-              <input
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className="mt-1 block w-full rounded-lg border border-slate-300 px-4 py-3 focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500"
-                placeholder="••••••••"
-                required
-              />
-            </div>
-          )}
-
-          <button
-            type="submit"
-            disabled={loading}
-            className="flex w-full justify-center rounded-lg bg-primary-600 px-4 py-3 text-sm font-semibold text-white shadow-sm hover:bg-primary-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-600 disabled:opacity-50"
-          >
-            {loading ? 'جاري المعالجة...' : 
-             mode === 'login' ? 'تسجيل الدخول' : 
-             mode === 'forgot' ? 'إرسال رابط الاستعادة' : 
-             'تحديث كلمة المرور'}
-          </button>
-        </form>
-
-        {!isRecoveryMode && (
-          <div className="mt-6 text-center text-sm">
-            {mode === 'login' ? (
-              <button onClick={() => setMode('forgot')} className="text-primary-600 hover:text-primary-500">
-                هل نسيت كلمة المرور؟
-              </button>
-            ) : (
-              <button onClick={() => setMode('login')} className="text-primary-600 hover:text-primary-500">
-                العودة لتسجيل الدخول
-              </button>
+          <form onSubmit={handleAuth} className="mt-6 space-y-4">
+            {(mode === 'login' || mode === 'forgot') && (
+              <Field label="البريد الإلكتروني" htmlFor="login-email">
+                <input
+                  id="login-email"
+                  type="email"
+                  dir="ltr"
+                  autoComplete="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  className={inputClass + ' text-left'}
+                  required
+                />
+              </Field>
             )}
-          </div>
-        )}
+
+            {(mode === 'login' || mode === 'reset') && (
+              <Field label={mode === 'reset' ? 'كلمة المرور الجديدة' : 'كلمة المرور'} htmlFor="login-password">
+                <input
+                  id="login-password"
+                  type="password"
+                  dir="ltr"
+                  autoComplete={mode === 'reset' ? 'new-password' : 'current-password'}
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  className={inputClass + ' text-left'}
+                  required
+                />
+              </Field>
+            )}
+
+            <button type="submit" disabled={loading} className={buttonClass('primary', 'w-full')}>
+              {loading ? 'جارٍ المعالجة...' :
+               mode === 'login' ? 'دخول' :
+               mode === 'forgot' ? 'إرسال رابط الاستعادة' :
+               'حفظ كلمة المرور'}
+            </button>
+          </form>
+
+          {!isRecoveryMode && (
+            <div className="mt-5 border-t border-slate-100 pt-4 text-center text-sm">
+              {mode === 'login' ? (
+                <button onClick={() => setMode('forgot')} className="font-medium text-primary-700 hover:text-primary-900">
+                  نسيت كلمة المرور؟
+                </button>
+              ) : (
+                <button onClick={() => setMode('login')} className="font-medium text-primary-700 hover:text-primary-900">
+                  العودة إلى تسجيل الدخول
+                </button>
+              )}
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );

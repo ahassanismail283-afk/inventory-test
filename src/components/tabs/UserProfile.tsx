@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from '../../lib/supabase';
-import { User, Settings, Image as ImageIcon, Mail, Lock, Check } from 'lucide-react';
+import { Image as ImageIcon, Lock, Check } from 'lucide-react';
+import { Card, CardTitle, Field, PageHeader, buttonClass, inputClass } from '../ui';
 import { useAuth } from '../../contexts/AuthContext';
 import { toast } from 'react-hot-toast';
 
@@ -94,7 +95,7 @@ const UserProfile: React.FC = () => {
         .eq('id', profile.id);
       
       if (error) throw error;
-      toast.success('تم تحديث الملف الشخصي والصورة بنجاح. قد تحتاج للتحديث (Refresh) لرؤية التغييرات.');
+      toast.success('تم تحديث الملف الشخصي والصورة بنجاح. قد تحتاج إلى إعادة تحميل الصفحة لرؤية التغييرات.');
     } catch (err: any) {
       toast.error('لم نتمكن من تحديث الملف الشخصي');
     } finally {
@@ -127,129 +128,97 @@ const UserProfile: React.FC = () => {
   };
 
   return (
-    <div className="mx-auto max-w-4xl p-6 space-y-8">
-      <div className="flex items-center gap-3">
-        <div className="rounded-xl bg-primary-50/50 p-2.5 text-primary-600 shadow-sm backdrop-blur-sm">
-          <Settings className="h-6 w-6" />
-        </div>
-        <div>
-          <h2 className="text-2xl font-bold text-slate-800 font-serif tracking-tight">إعدادات الحساب</h2>
-          <p className="text-sm text-slate-500">تخصيص ملفك الشخصي وبيانات الدخول</p>
-        </div>
-      </div>
+    <div className="max-w-3xl space-y-4">
+      <PageHeader title="إعدادات الحساب" description="اسمك وصورتك كما يظهران للزملاء، وبيانات الدخول." />
 
       {/* Profile Section */}
-      <div className="rounded-2xl border border-white/40 bg-white/70 backdrop-blur-xl p-8 shadow-[0_8px_30px_rgb(0,0,0,0.04)]">
-        <div className="flex items-center gap-2 mb-6">
-          <User className="h-5 w-5 text-primary-600" />
-          <h3 className="text-lg font-bold font-serif text-slate-800">الملف الشخصي (العام)</h3>
-        </div>
+      <Card>
+        <CardTitle>الملف الشخصي</CardTitle>
+        <form onSubmit={handleUpdateProfile} className="p-5">
+          <div className="flex flex-col gap-5 sm:flex-row sm:items-center">
+            <button
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              className="group relative h-20 w-20 shrink-0 overflow-hidden rounded-xl border border-slate-200 bg-slate-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-700"
+              aria-label="تغيير الصورة"
+            >
+              {avatarPreview ? (
+                <img src={avatarPreview} alt="" className="h-full w-full object-cover" />
+              ) : (
+                <ImageIcon className="mx-auto h-7 w-7 text-slate-400" strokeWidth={1.5} />
+              )}
+              <span className="absolute inset-x-0 bottom-0 bg-slate-900/60 py-1 text-xs font-medium text-white opacity-0 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100">
+                تغيير
+              </span>
+            </button>
+            <input
+              type="file"
+              ref={fileInputRef}
+              className="hidden"
+              accept="image/*"
+              onChange={handleImageChange}
+            />
 
-        <form onSubmit={handleUpdateProfile} className="space-y-6">
-          <div className="flex items-center gap-6">
-            <div className="flex flex-col items-center gap-2">
-              <div 
-                className="h-24 w-24 rounded-full bg-primary-50 flex items-center justify-center overflow-hidden border-2 border-primary-100 shadow-sm relative group cursor-pointer"
-                onClick={() => fileInputRef.current?.click()}
-              >
-                {avatarPreview ? (
-                  <img src={avatarPreview} alt="Avatar Preview" className="h-full w-full object-cover" />
-                ) : (
-                  <ImageIcon className="h-8 w-8 text-slate-300" />
-                )}
-                <div className="absolute inset-0 bg-primary-900/50 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                  <span className="text-xs font-bold text-white">تغيير</span>
-                </div>
-              </div>
-              <input 
-                type="file" 
-                ref={fileInputRef} 
-                className="hidden" 
-                accept="image/*" 
-                onChange={handleImageChange}
-              />
-            </div>
-            
-            <div className="flex-1">
-              <label className="block text-sm font-medium text-slate-700 mb-1">الاسم المستعار (Nickname)</label>
-              <input
-                type="text"
-                value={nickname}
-                onChange={(e) => setNickname(e.target.value)}
-                placeholder="كيف ترغب أن نناديك؟"
-                className="mt-1 block max-w-sm w-full rounded-xl border-0 py-2.5 px-4 text-slate-900 ring-1 ring-inset ring-slate-200 focus:ring-2 focus:ring-primary-600 bg-primary-50 focus:bg-white shadow-sm transition-all"
-              />
+            <div className="flex-1 sm:max-w-sm">
+              <Field label="الاسم الظاهر" htmlFor="profile-nickname">
+                <input
+                  id="profile-nickname"
+                  type="text"
+                  value={nickname}
+                  onChange={(e) => setNickname(e.target.value)}
+                  className={inputClass}
+                />
+              </Field>
             </div>
           </div>
 
-          <div className="flex justify-end pt-2 border-t border-slate-100">
-            <button
-              type="submit"
-              disabled={isUpdatingProfile}
-              className="flex items-center gap-2 rounded-xl bg-gradient-to-bl from-primary-700 to-primary-600 px-6 py-2.5 text-sm font-semibold text-white shadow-sm hover:from-primary-800 hover:to-primary-700 transition-all disabled:opacity-50"
-            >
+          <div className="mt-5 flex justify-end border-t border-slate-100 pt-4">
+            <button type="submit" disabled={isUpdatingProfile} className={buttonClass('primary')}>
               <Check className="h-4 w-4" />
-              {isUpdatingProfile ? 'جاري الحفظ...' : 'حفظ الملف الشخصي'}
+              {isUpdatingProfile ? 'جارٍ الحفظ...' : 'حفظ الملف الشخصي'}
             </button>
           </div>
         </form>
-      </div>
+      </Card>
 
       {/* Security Section */}
-      <div className="rounded-2xl border border-white/40 bg-white/70 backdrop-blur-xl p-8 shadow-[0_8px_30px_rgb(0,0,0,0.04)]">
-        <div className="flex flex-col gap-1 mb-6">
-          <div className="flex items-center gap-2">
-            <Lock className="h-5 w-5 text-primary-600" />
-            <h3 className="text-lg font-bold font-serif text-slate-800">بيانات الأمان</h3>
-          </div>
-          <p className="text-xs text-slate-500 pr-7">استخدم هذه الإعدادات لتغيير بريدك أو كلمة المرور الخاصة بك عبر نظام Supabase الآمن</p>
-        </div>
+      <Card>
+        <CardTitle>بيانات الدخول</CardTitle>
+        <form onSubmit={handleUpdateCredentials} className="p-5">
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+            <Field label="البريد الإلكتروني" htmlFor="profile-email" hint="إذا غيّرته ستصلك رسالة تأكيد على البريد الجديد.">
+              <input
+                id="profile-email"
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                className={inputClass + ' text-left'}
+                dir="ltr"
+              />
+            </Field>
 
-        <form onSubmit={handleUpdateCredentials} className="space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">البريد الإلكتروني الجديد</label>
-              <div className="relative">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <Mail className="h-5 w-5 text-slate-300" />
-                </div>
-                <input
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  className="mt-1 block w-full rounded-xl border-0 py-2.5 px-4 pl-10 text-slate-900 ring-1 ring-inset ring-slate-200 focus:ring-2 focus:ring-primary-600 bg-primary-50 focus:bg-white shadow-sm transition-all"
-                  dir="ltr"
-                />
-              </div>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">كلمة المرور الجديدة</label>
-              <div className="relative">
-                <input
-                  type="password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  placeholder="اتركه فارغاً إن لم ترغب في التغيير"
-                  className="mt-1 block w-full rounded-xl border-0 py-2.5 px-4 text-slate-900 ring-1 ring-inset ring-slate-200 focus:ring-2 focus:ring-primary-600 bg-primary-50 focus:bg-white shadow-sm transition-all"
-                  minLength={6}
-                />
-              </div>
-            </div>
+            <Field label="كلمة المرور الجديدة" htmlFor="profile-password" hint="اتركها فارغة إن لم ترد تغييرها.">
+              <input
+                id="profile-password"
+                type="password"
+                dir="ltr"
+                autoComplete="new-password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                className={inputClass + ' text-left'}
+                minLength={6}
+              />
+            </Field>
           </div>
 
-          <div className="flex justify-end pt-2 border-t border-slate-100">
-            <button
-              type="submit"
-              disabled={isUpdatingCredentials}
-              className="flex items-center gap-2 rounded-xl bg-slate-800 px-6 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-slate-900 transition-all disabled:opacity-50"
-            >
-              <Check className="h-4 w-4" />
-              {isUpdatingCredentials ? 'جاري التحديث...' : 'تحديث بيانات الدخول'}
+          <div className="mt-5 flex justify-end border-t border-slate-100 pt-4">
+            <button type="submit" disabled={isUpdatingCredentials} className={buttonClass('secondary')}>
+              <Lock className="h-4 w-4" strokeWidth={1.75} />
+              {isUpdatingCredentials ? 'جارٍ التحديث...' : 'تحديث بيانات الدخول'}
             </button>
           </div>
         </form>
-      </div>
+      </Card>
 
     </div>
   );

@@ -3,7 +3,9 @@ import { useInventory } from '../../hooks/useInventory';
 import { useAuth } from '../../contexts/AuthContext';
 import { supabase } from '../../lib/supabase';
 import { toast } from 'react-hot-toast';
+import { findMatchingItems } from '../../lib/itemNames';
 import { Package, Plus, Trash2 } from 'lucide-react';
+import { Card, CardTitle, EmptyState, Field, PageHeader, StockValue, TableSkeleton, buttonClass, iconButtonClass, inputClass, td, th, theadClass } from '../ui';
 
 const ItemManagement: React.FC = () => {
   const { items, fetchItems, loading, deleteItem } = useInventory();
@@ -19,9 +21,16 @@ const ItemManagement: React.FC = () => {
     
     setIsImporting(true);
 
-    const existingNames = new Set(items.map(i => i.name));
-    if (existingNames.has(name)) {
-      toast.error('هذا الصنف موجود مسبقاً.');
+    // Same name once spelling variants are folded: refuse. Close names: ask first.
+    const match = findMatchingItems(name, items);
+    if (match.exact) {
+      toast.error(`هذا الصنف موجود مسبقا باسم «${match.exact.name}».`);
+      setIsImporting(false);
+      return;
+    }
+    if (match.similar.length > 0 && !window.confirm(
+      `الاسم «${name}» يشبه أصنافا موجودة:\n${match.similar.map(m => `- ${m.name}`).join('\n')}\n\nهل هو صنف مختلف فعلا وتريد إضافته؟`
+    )) {
       setIsImporting(false);
       return;
     }
@@ -74,94 +83,91 @@ const ItemManagement: React.FC = () => {
     }
   };
 
-  return (
-    <div className="mx-auto max-w-5xl p-6">
-      <div className="mb-8 flex items-center gap-3">
-        <div className="rounded-xl bg-primary-50/50 p-2.5 text-primary-600 shadow-sm backdrop-blur-sm">
-          <Package className="h-6 w-6" />
-        </div>
-        <h2 className="text-2xl font-bold text-slate-800 font-serif tracking-tight">إدارة الأصناف المخزنية</h2>
-      </div>
+  const outOfStock = items.filter(i => i.currentQuantity <= 0).length;
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        
+  return (
+    <div>
+      <PageHeader title="الأصناف" description="أصناف العهدة في الوحدة الحالية وأرصدتها." />
+
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-[20rem_1fr] lg:items-start">
+
         {/* Add Single Item */}
-        <div className="lg:col-span-1 rounded-2xl border border-white/40 bg-white/70 backdrop-blur-xl p-8 shadow-[0_8px_30px_rgb(0,0,0,0.04)] flex flex-col h-fit">
-          <h3 className="text-lg font-semibold text-slate-900 mb-4">إضافة صنف جديد</h3>
-          <p className="text-sm text-slate-500 mb-4">
-            قم بإدخال اسم الصنف والرصيد الافتتاحي له.
-          </p>
-          
-          <div className="space-y-4 mb-4 text-right">
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">اسم الصنف</label>
+        <Card>
+          <CardTitle>صنف جديد</CardTitle>
+          <form
+            onSubmit={(e) => { e.preventDefault(); handleAddSingleItem(); }}
+            className="space-y-4 p-5"
+          >
+            <Field label="اسم الصنف" htmlFor="new-item-name">
               <input
+                id="new-item-name"
                 type="text"
                 value={newItemName}
                 onChange={(e) => setNewItemName(e.target.value)}
-                className="w-full rounded-xl border-0 py-2.5 px-4 text-slate-900 ring-1 ring-inset ring-slate-200 focus:ring-2 focus:ring-primary-600 bg-white/50 shadow-sm transition-all text-sm"
-                placeholder="أدخل اسم الصنف..."
+                className={inputClass}
               />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">الكمية الافتتاحية</label>
+            </Field>
+            <Field label="الرصيد الافتتاحي" htmlFor="new-item-qty" hint="يُسجَّل كحركة وارد بتاريخ اليوم.">
               <input
+                id="new-item-qty"
                 type="number"
+                inputMode="decimal"
                 min="0"
                 value={newItemQty}
                 onChange={(e) => setNewItemQty(e.target.value)}
-                className="w-full rounded-xl border-0 py-2.5 px-4 text-slate-900 ring-1 ring-inset ring-slate-200 focus:ring-2 focus:ring-primary-600 bg-white/50 shadow-sm transition-all text-sm"
+                className={inputClass + ' tabular-nums'}
                 placeholder="0"
               />
-            </div>
-          </div>
+            </Field>
+            <button
+              type="submit"
+              disabled={isImporting || !newItemName.trim()}
+              className={buttonClass('primary', 'w-full')}
+            >
+              <Plus className="h-4 w-4" />
+              {isImporting ? 'جارٍ الإضافة...' : 'إضافة الصنف'}
+            </button>
+          </form>
+        </Card>
 
-          <button
-            onClick={handleAddSingleItem}
-            disabled={isImporting || !newItemName.trim()}
-            className="w-full flex items-center justify-center gap-2 rounded-xl bg-gradient-to-l from-primary-600 to-primary-500 px-4 py-3.5 mt-auto font-bold text-white shadow-md hover:shadow-lg disabled:opacity-50 transition-all"
+        {/* Items list */}
+        <Card className="overflow-hidden">
+          <CardTitle
+            aside={
+              <span className="text-sm text-slate-600">
+                {items.length} صنف{outOfStock > 0 && <span className="text-red-700">، {outOfStock} رصيده صفر</span>}
+              </span>
+            }
           >
-            <Plus className="h-5 w-5" />
-            {isImporting ? 'جاري الإضافة...' : 'إضافة الصنف'}
-          </button>
-        </div>
+            الأصناف الحالية
+          </CardTitle>
 
-        {/* Items Grid */}
-        <div className="lg:col-span-2 rounded-2xl border border-white/40 bg-white/70 backdrop-blur-xl p-8 shadow-[0_8px_30px_rgb(0,0,0,0.04)] overflow-hidden">
-          <div className="flex justify-between items-center mb-6">
-             <h3 className="text-lg font-semibold text-slate-800 tracking-tight">الأصناف الحالية ({items.length})</h3>
-          </div>
-          
           <div className="overflow-x-auto">
             {loading ? (
-              <div className="text-center py-12 text-slate-500 font-medium">جاري التحميل...</div>
+              <TableSkeleton rows={6} cols={2} />
             ) : items.length === 0 ? (
-               <div className="text-center py-12 text-slate-500 bg-white/50 rounded-xl font-medium">لا توجد أصناف في هذا الموقع بعد.</div>
+              <EmptyState icon={Package} title="لا توجد أصناف في هذه الوحدة" hint="أضف أول صنف من النموذج مع رصيده الافتتاحي." />
             ) : (
-              <table className="w-full min-w-[500px] text-right">
-                 <thead>
-                  <tr className="bg-slate-50/50 text-sm text-slate-500 uppercase tracking-wider">
-                     <th className="py-4 px-6 font-semibold">الصنف</th>
-                     <th className="py-4 px-6 font-semibold text-center">الرصيد الحالي</th>
-                     <th className="py-4 px-6 font-semibold text-center rounded-tl-xl w-24">إجراءات</th>
+              <table className="w-full min-w-[420px]">
+                <thead className={theadClass}>
+                  <tr>
+                    <th className={th}>الصنف</th>
+                    <th className={th + ' w-32 text-center'}>الرصيد الحالي</th>
+                    <th className={th + ' w-16'}><span className="sr-only">إجراءات</span></th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-100/50">
+                <tbody className="divide-y divide-slate-100">
                   {items.map(item => (
-                    <tr key={item.id} className="hover:bg-slate-50/80 transition-colors">
-                      <td className="py-4 px-6 font-bold text-slate-800">{item.name}</td>
-                      <td className="py-4 px-6 text-center">
-                        <span className={`inline-flex items-center justify-center min-w-[3rem] px-3 py-1 rounded-full text-sm font-bold tracking-wide ${item.currentQuantity <= 0 ? 'bg-red-50 text-red-700' : 'bg-primary-50 text-primary-700'}`}>
-                          {item.currentQuantity}
-                        </span>
-                      </td>
-                      <td className="py-4 px-6 text-center">
+                    <tr key={item.id} className="hover:bg-slate-50">
+                      <td className={td + ' font-medium text-slate-900'}>{item.name}</td>
+                      <td className={td + ' text-center'}><StockValue value={item.currentQuantity} /></td>
+                      <td className={td + ' text-left'}>
                         <button
                           onClick={() => handleDeleteItem(item.id, item.name)}
-                          className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
-                          title="حذف الصنف"
+                          className={iconButtonClass('danger')}
+                          aria-label={`حذف ${item.name}`}
                         >
-                          <Trash2 className="h-5 w-5 mx-auto" />
+                          <Trash2 className="h-4 w-4" strokeWidth={1.75} />
                         </button>
                       </td>
                     </tr>
@@ -170,7 +176,7 @@ const ItemManagement: React.FC = () => {
               </table>
             )}
           </div>
-        </div>
+        </Card>
       </div>
     </div>
   );

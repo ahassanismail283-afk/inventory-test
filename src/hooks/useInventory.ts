@@ -107,6 +107,78 @@ export function useInventory() {
     }
   };
 
+  // Records one movement type for several items at once, e.g. a week's consumption sheet.
+  // All movements are inserted in a single request; balances are then updated item by item.
+  const addTransactionsBatch = async (
+    entries: { itemId: string; quantity: number }[],
+    type: 'إضافة' | 'استهلاك',
+    date: string,
+    // Brand-new items received in the same batch (additions only); created with their quantity
+    newItems: { name: string; quantity: number }[] = []
+  ) => {
+    if (!activeLocationId || !user || entries.length + newItems.length === 0) return false;
+    setLoading(true);
+    const failed: string[] = [];
+    try {
+      const rows = entries.map(e => {
+        const item = items.find(i => i.id === e.itemId);
+        if (!item) throw new Error('صنف غير موجود في القائمة');
+        return { item, quantity: e.quantity };
+      });
+
+      let created: Item[] = [];
+      if (newItems.length > 0) {
+        const { data, error } = await supabase
+          .from('items')
+          .insert(newItems.map(n => ({ name: n.name.trim(), currentQuantity: n.quantity, locationId: activeLocationId })))
+          .select();
+        if (error) throw error;
+        created = data || [];
+      }
+      const createdRows = created.map(item => ({
+        item,
+        quantity: newItems.find(n => n.name.trim() === item.name)?.quantity ?? item.currentQuantity,
+      }));
+
+      const { error: txError } = await supabase.from('transactions').insert(
+        [...rows, ...createdRows].map(({ item, quantity }) => ({
+          itemId: item.id,
+          itemName: item.name,
+          type,
+          quantity,
+          date,
+          locationId: activeLocationId,
+          userId: user.id,
+        }))
+      );
+      if (txError) throw txError;
+
+      for (const { item, quantity } of rows) {
+        const change = type === 'إضافة' ? quantity : -quantity;
+        const { error } = await supabase
+          .from('items')
+          .update({ currentQuantity: item.currentQuantity + change })
+          .eq('id', item.id);
+        if (error) failed.push(item.name);
+      }
+
+      if (failed.length > 0) {
+        toast.error(`سُجلت الحركات، لكن تعذر تحديث رصيد: ${failed.join('، ')}`, { duration: 10000 });
+      } else {
+        toast.success(`تم تسجيل ${rows.length + createdRows.length} حركة بنجاح${createdRows.length ? ` وإضافة ${createdRows.length} صنف جديد` : ""}`);
+      }
+      await fetchItems();
+      await fetchTransactions();
+      return failed.length === 0;
+    } catch (err: any) {
+      console.error(err);
+      toast.error('فشل في تسجيل الحركات: ' + err.message);
+      return false;
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const deleteTransaction = async (txId: string) => {
     setLoading(true);
     try {
@@ -207,6 +279,7 @@ export function useInventory() {
     transactions,
     loading,
     addTransaction,
+    addTransactionsBatch,
     deleteTransaction,
     editTransaction,
     fetchItems,

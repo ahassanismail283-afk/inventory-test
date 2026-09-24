@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import { MapPin, Plus, Trash2 } from 'lucide-react';
+import { Card, CardTitle, EmptyState, Field, PageHeader, TableSkeleton, buttonClass, iconButtonClass, inputClass } from '../ui';
 import { Location } from '../../types';
 import { toast } from 'react-hot-toast';
 
@@ -63,83 +64,62 @@ const LocationManagement: React.FC = () => {
   };
 
   return (
-    <div className="mx-auto max-w-4xl p-6">
-      <div className="mb-8 flex items-center gap-3">
-        <div className="rounded-lg bg-primary-100 p-2 text-primary-600">
-          <MapPin className="h-6 w-6" />
-        </div>
-        <div>
-          <h2 className="text-2xl font-bold text-slate-900">إدارة المواقع والوحدات</h2>
-          <p className="text-sm text-slate-500">إضافة أو حذف المواقع والعيادات</p>
-        </div>
-      </div>
+    <div>
+      <PageHeader title="الوحدات والمواقع" description="الوحدات والعيادات التي تُسجَّل عليها العهدة." />
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-        <div className="md:col-span-1">
-          <form onSubmit={handleAddLocation} className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
-            <h3 className="text-lg font-semibold text-slate-900 mb-4">إضافة موقع جديد</h3>
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-slate-700">اسم الموقع</label>
-                <input
-                  type="text"
-                  value={newLocationName}
-                  onChange={(e) => setNewLocationName(e.target.value)}
-                  className="mt-1 block w-full rounded-lg border border-slate-300 px-4 py-2 focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500"
-                  placeholder="الوحدة البيطرية بشندويل..."
-                  required
-                />
-              </div>
-              <button
-                type="submit"
-                disabled={loading || !newLocationName.trim()}
-                className="w-full flex items-center justify-center gap-2 rounded-lg bg-primary-600 px-4 py-2 font-medium text-white hover:bg-primary-500 disabled:opacity-50"
-              >
-                <Plus className="h-5 w-5" />
-                إضافة
-              </button>
-            </div>
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-[20rem_1fr] lg:items-start">
+        <Card>
+          <CardTitle>موقع جديد</CardTitle>
+          <form onSubmit={handleAddLocation} className="space-y-4 p-5">
+            <Field label="اسم الموقع" htmlFor="new-location">
+              <input
+                id="new-location"
+                type="text"
+                value={newLocationName}
+                onChange={(e) => setNewLocationName(e.target.value)}
+                className={inputClass}
+                required
+              />
+            </Field>
+            <button
+              type="submit"
+              disabled={loading || !newLocationName.trim()}
+              className={buttonClass('primary', 'w-full')}
+            >
+              <Plus className="h-4 w-4" />
+              إضافة
+            </button>
           </form>
-        </div>
+        </Card>
 
-        <div className="md:col-span-2 rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
-           <h3 className="text-lg font-semibold text-slate-900 mb-4">المواقع الحالية</h3>
-           <div className="overflow-hidden rounded-lg border border-slate-200">
-             <table className="min-w-full divide-y divide-slate-200 text-right">
-                <thead className="bg-slate-50">
-                  <tr>
-                    <th scope="col" className="px-6 py-3 text-sm font-semibold text-slate-900">اسم الموقع</th>
-                    <th scope="col" className="px-6 py-3 text-sm font-semibold text-slate-900 w-24">إجراءات</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-200 bg-white">
-                  {locations.length === 0 ? (
-                    <tr>
-                      <td colSpan={2} className="px-6 py-4 text-center text-sm text-slate-500">
-                        لا توجد مواقع مسجلة.
-                      </td>
-                    </tr>
-                  ) : (
-                    locations.map((loc) => (
-                      <tr key={loc.id}>
-                        <td className="whitespace-nowrap px-6 py-4 text-sm font-medium text-slate-900">
-                          {loc.name}
-                        </td>
-                        <td className="whitespace-nowrap px-6 py-4 text-sm">
-                          <button
-                            onClick={() => handleDelete(loc.id)}
-                            className="text-red-600 hover:text-red-900 hover:bg-red-50 p-1.5 rounded"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </button>
-                        </td>
-                      </tr>
-                    ))
-                  )}
-                </tbody>
-             </table>
-           </div>
-        </div>
+        <Card className="overflow-hidden">
+          <CardTitle aside={<span className="text-sm text-slate-600">{locations.length} موقع</span>}>
+            المواقع الحالية
+          </CardTitle>
+          {loading && locations.length === 0 ? (
+            <TableSkeleton rows={3} cols={1} />
+          ) : locations.length === 0 ? (
+            <EmptyState icon={MapPin} title="لا توجد مواقع مسجلة" hint="أضف أول وحدة من النموذج، ثم خصصها للمستخدمين من شاشة المستخدمين." />
+          ) : (
+            <ul className="divide-y divide-slate-100">
+              {locations.map((loc) => (
+                <li key={loc.id} className="flex items-center justify-between gap-4 px-5 py-3 hover:bg-slate-50">
+                  <div className="flex items-center gap-3">
+                    <MapPin className="h-4 w-4 text-slate-500" strokeWidth={1.75} />
+                    <span className="text-sm font-medium text-slate-900">{loc.name}</span>
+                  </div>
+                  <button
+                    onClick={() => handleDelete(loc.id)}
+                    className={iconButtonClass('danger')}
+                    aria-label={`حذف ${loc.name}`}
+                  >
+                    <Trash2 className="h-4 w-4" strokeWidth={1.75} />
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </Card>
       </div>
     </div>
   );

@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { supabase } from '../../lib/supabase';
-import { createClient } from '@supabase/supabase-js';
+import { supabase, createIsolatedAuthClient } from '../../lib/supabase';
 import { Users, UserPlus, Trash2 } from 'lucide-react';
 import { UserProfile, Location, Role } from '../../types';
 import { toast } from 'react-hot-toast';
+import { Card, CardTitle, EmptyState, Field, PageHeader, TableSkeleton, buttonClass, cx, iconButtonClass, inputClass, roleLabels, td, th, theadClass } from '../ui';
 
 const UserManagement: React.FC = () => {
   const [users, setUsers] = useState<UserProfile[]>([]);
@@ -98,14 +98,7 @@ const UserManagement: React.FC = () => {
     setIsCreating(true);
     try {
       // 1. Create a secondary client bypassing session persistence to avoid logging out the Admin
-      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || 'https://placeholder.supabase.co';
-      const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY || 'placeholder';
-      const adminAuthClient = createClient(supabaseUrl, supabaseKey, {
-        auth: {
-          persistSession: false,
-          autoRefreshToken: false,
-        }
-      });
+      const adminAuthClient = createIsolatedAuthClient();
 
       // 2. Sign up the user (make sure Email Confirmations are disabled in Supabase dashboard)
       const { data: authData, error: authError } = await adminAuthClient.auth.signUp({
@@ -116,14 +109,16 @@ const UserManagement: React.FC = () => {
       if (authError) throw authError;
       if (!authData.user) throw new Error('فشل إنشاء المستخدم في نظام المصادقة');
 
-      // 3. Insert user configuration into `users` table
-      const { error: dbError } = await supabase.from('users').insert({
+      // 3. Save user configuration into `users` table.
+      // The on_auth_user_created trigger already inserted a default CLIENT row during sign-up,
+      // so upsert to overwrite it with the chosen role and locations instead of failing on the duplicate id.
+      const { error: dbError } = await supabase.from('users').upsert({
         id: authData.user.id,
         email: authData.user.email,
         nickname: newNickname || authData.user.email?.split('@')[0],
         role: newRole,
         locationIds: newLocationIds
-      });
+      }, { onConflict: 'id' });
 
       if (dbError) throw dbError;
 
@@ -144,178 +139,181 @@ const UserManagement: React.FC = () => {
     }
   };
 
+  const chipClass = (active: boolean) =>
+    cx(
+      'rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors',
+      active
+        ? 'border-primary-700 bg-primary-700 text-white hover:bg-primary-800'
+        : 'border-slate-300 bg-white text-slate-700 hover:border-slate-400 hover:bg-slate-50'
+    );
+
   return (
-    <div className="mx-auto max-w-6xl p-6">
-      <div className="mb-8 flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <div className="rounded-xl bg-primary-50/50 p-2.5 text-primary-600 shadow-sm backdrop-blur-sm">
-            <Users className="h-6 w-6" />
-          </div>
-          <h2 className="text-2xl font-bold text-slate-800 font-serif tracking-tight">إدارة المستخدمين</h2>
-        </div>
-      </div>
+    <div>
+      <PageHeader title="المستخدمون" description="أنشئ حسابات الموظفين وحدد دور كل منهم والوحدات التي يعمل عليها." />
 
       {/* Admin User Creation Form Engine */}
-      <div className="rounded-2xl border border-white/40 bg-white/70 backdrop-blur-xl p-8 shadow-[0_8px_30px_rgb(0,0,0,0.04)] mb-8">
-        <div className="flex items-center gap-2 mb-6">
-          <UserPlus className="h-5 w-5 text-primary-600" />
-          <h3 className="text-lg font-bold font-serif text-slate-800">إضافة مستخدم جديد</h3>
-        </div>
-        <form onSubmit={handleCreateUser} className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-          <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">البريد الإلكتروني</label>
+      <Card className="mb-4">
+        <CardTitle>مستخدم جديد</CardTitle>
+        <form onSubmit={handleCreateUser} className="grid grid-cols-1 gap-4 p-5 md:grid-cols-2 lg:grid-cols-4">
+          <Field label="البريد الإلكتروني" htmlFor="new-user-email">
             <input
+              id="new-user-email"
               type="email"
+              dir="ltr"
               value={newEmail}
               onChange={(e) => setNewEmail(e.target.value)}
-              className="mt-1 block w-full rounded-xl border-0 py-2.5 px-4 text-slate-900 ring-1 ring-inset ring-slate-200 focus:ring-2 focus:ring-primary-600 bg-primary-50 focus:bg-white shadow-sm transition-all"
+              className={inputClass + ' text-left'}
               required
             />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">كلمة المرور (6+ أحرف)</label>
+          </Field>
+          <Field label="كلمة المرور" htmlFor="new-user-password" hint="ستة أحرف على الأقل.">
             <input
+              id="new-user-password"
               type="password"
+              dir="ltr"
+              autoComplete="new-password"
               value={newPassword}
               onChange={(e) => setNewPassword(e.target.value)}
-              className="mt-1 block w-full rounded-xl border-0 py-2.5 px-4 text-slate-900 ring-1 ring-inset ring-slate-200 focus:ring-2 focus:ring-primary-600 bg-primary-50 focus:bg-white shadow-sm transition-all"
+              className={inputClass + ' text-left'}
               required
               minLength={6}
             />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">الاسم المستعار (اختياري)</label>
+          </Field>
+          <Field label="الاسم الظاهر (اختياري)" htmlFor="new-user-nickname">
             <input
+              id="new-user-nickname"
               type="text"
               value={newNickname}
               onChange={(e) => setNewNickname(e.target.value)}
-              className="mt-1 block w-full rounded-xl border-0 py-2.5 px-4 text-slate-900 ring-1 ring-inset ring-slate-200 focus:ring-2 focus:ring-primary-600 bg-primary-50 focus:bg-white shadow-sm transition-all"
+              className={inputClass}
             />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">الرتبة الأولية</label>
+          </Field>
+          <Field label="الدور" htmlFor="new-user-role">
             <select
+              id="new-user-role"
               value={newRole}
               onChange={(e) => setNewRole(e.target.value as Role)}
-              className="mt-1 block w-full rounded-xl border-0 py-2.5 px-4 text-slate-900 ring-1 ring-inset ring-slate-200 focus:ring-2 focus:ring-primary-600 bg-primary-50 focus:bg-white shadow-sm transition-all"
+              className={inputClass}
             >
-              <option value="CLIENT">مدخل بيانات (CLIENT)</option>
-              <option value="MANAGER">مراقب (MANAGER)</option>
-              <option value="ADMIN">مدير النظام (ADMIN)</option>
+              <option value="CLIENT">{roleLabels.CLIENT}</option>
+              <option value="MANAGER">{roleLabels.MANAGER}</option>
+              <option value="ADMIN">{roleLabels.ADMIN}</option>
             </select>
-          </div>
+          </Field>
 
           {newRole !== 'ADMIN' && (
-            <div className="md:col-span-2 lg:col-span-4">
-              <label className="block text-sm font-medium text-slate-700 mb-2">تخصيص مواقع الموظف الجديد</label>
+            <fieldset className="md:col-span-2 lg:col-span-4">
+              <legend className="mb-2 text-sm font-medium text-slate-800">الوحدات المسموح بها</legend>
               <div className="flex flex-wrap gap-2">
                 {locations.map((loc) => (
                   <button
                     key={loc.id}
                     type="button"
+                    aria-pressed={newLocationIds.includes(loc.id)}
                     onClick={() => toggleNewLocation(loc.id)}
-                    className={`px-3 py-1.5 rounded-full text-xs font-semibold transition-all ${
-                      newLocationIds.includes(loc.id)
-                        ? 'bg-primary-600 text-white shadow-md'
-                        : 'bg-primary-50 text-slate-600 hover:bg-primary-100'
-                    }`}
+                    className={chipClass(newLocationIds.includes(loc.id))}
                   >
                     {loc.name}
                   </button>
                 ))}
               </div>
-            </div>
+            </fieldset>
           )}
 
-          <div className="md:col-span-2 lg:col-span-4 flex justify-end mt-2">
-            <button
-              type="submit"
-              disabled={isCreating}
-              className="rounded-xl bg-gradient-to-bl from-primary-700 to-primary-600 px-8 py-3 text-sm font-semibold text-white shadow-sm hover:from-primary-800 hover:to-primary-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-600 transition-all disabled:opacity-50"
-            >
-              {isCreating ? 'جاري الإنشاء...' : 'تسجيل المستخدم'}
+          <div className="flex justify-end border-t border-slate-100 pt-4 md:col-span-2 lg:col-span-4">
+            <button type="submit" disabled={isCreating} className={buttonClass('primary', 'w-full sm:w-auto')}>
+              <UserPlus className="h-4 w-4" strokeWidth={1.75} />
+              {isCreating ? 'جارٍ الإنشاء...' : 'إنشاء الحساب'}
             </button>
           </div>
         </form>
-      </div>
+      </Card>
 
-      <div className="rounded-2xl border border-white/40 bg-white/70 backdrop-blur-xl shadow-[0_8px_30px_rgb(0,0,0,0.04)] overflow-hidden">
-        {loading ? (
-             <div className="text-center py-8 text-slate-500">جاري التحميل...</div>
+      <Card className="overflow-hidden">
+        <CardTitle aside={<span className="text-sm text-slate-600">{users.length} مستخدم</span>}>الحسابات الحالية</CardTitle>
+        <div className="overflow-x-auto">
+          {loading && users.length === 0 ? (
+            <TableSkeleton rows={4} cols={3} />
+          ) : users.length === 0 ? (
+            <EmptyState icon={Users} title="لا يوجد مستخدمون بعد" />
           ) : (
-          <table className="min-w-full divide-y divide-slate-200/60 text-right">
-            <thead className="bg-[#fbf9f5]">
-              <tr>
-                <th scope="col" className="px-6 py-4 text-sm font-bold text-slate-800">المستخدم</th>
-                <th scope="col" className="px-6 py-4 text-sm font-bold text-slate-800 text-center">الرتبة</th>
-                <th scope="col" className="px-6 py-4 text-sm font-bold text-slate-800 w-1/2">المواقع المصرح بها</th>
-                <th scope="col" className="px-6 py-4 text-sm font-bold text-slate-800">إجراءات</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100 bg-transparent">
-              {users.map((user) => (
-                <tr key={user.id} className="hover:bg-primary-50/30 transition-colors">
-                  <td className="whitespace-nowrap px-6 py-4">
-                    <div className="flex items-center gap-3">
-                      {user.avatar_base64 && (
-                        <img src={user.avatar_base64} alt="Avatar" className="h-10 w-10 rounded-full object-cover border border-slate-200" />
-                      )}
-                      <div>
-                        <div className="text-sm font-bold text-slate-900">{user.nickname || '-'}</div>
-                        <div className="text-xs font-medium text-slate-500">{user.email}</div>
-                      </div>
-                    </div>
-                  </td>
-                  <td className="whitespace-nowrap px-6 py-4 text-sm text-center">
-                    <select
-                      value={user.role}
-                      onChange={(e) => handleUpdateRole(user.id, e.target.value as Role)}
-                      className="rounded-xl border-slate-200 text-sm focus:ring-primary-600 focus:border-primary-600 bg-white"
-                    >
-                      <option value="ADMIN">مدير (ADMIN)</option>
-                      <option value="MANAGER">مراقب (MANAGER)</option>
-                      <option value="CLIENT">موظف (CLIENT)</option>
-                    </select>
-                  </td>
-                  <td className="px-6 py-4 text-sm">
-                    {user.role === 'ADMIN' ? (
-                      <span className="text-slate-500 italic">يملك صلاحية شاملة</span>
-                    ) : (
-                      <div className="flex flex-wrap gap-2">
-                        {locations.map(loc => {
-                          const hasAccess = user.locationIds?.includes(loc.id);
-                          return (
-                            <button
-                              key={loc.id}
-                              onClick={() => handleToggleLocationAccess(user, loc.id)}
-                              className={`px-3 py-1 rounded-full text-xs font-medium transition-colors ${
-                                hasAccess 
-                                  ? 'bg-primary-100 text-primary-700 hover:bg-primary-200' 
-                                  : 'bg-primary-50 text-slate-400 hover:bg-slate-200'
-                              }`}
-                            >
-                              {loc.name}
-                            </button>
-                          );
-                        })}
-                      </div>
-                    )}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-left text-sm font-medium">
-                    <button
-                      onClick={() => handleDeleteUser(user)}
-                      className="text-red-500 hover:text-red-700 hover:bg-red-50 p-2 rounded-lg transition-colors"
-                      title="حذف المستخدم"
-                    >
-                      <Trash2 className="h-5 w-5" />
-                    </button>
-                  </td>
+            <table className="w-full min-w-[720px]">
+              <thead className={theadClass}>
+                <tr>
+                  <th className={th}>المستخدم</th>
+                  <th className={th + ' w-44'}>الدور</th>
+                  <th className={th}>الوحدات المسموح بها</th>
+                  <th className={th + ' w-16'}><span className="sr-only">إجراءات</span></th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
-      </div>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {users.map((user) => (
+                  <tr key={user.id} className="align-top hover:bg-slate-50">
+                    <td className={td}>
+                      <div className="flex items-center gap-3">
+                        {user.avatar_base64 ? (
+                          <img src={user.avatar_base64} alt="" className="h-9 w-9 rounded-lg object-cover" />
+                        ) : (
+                          <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-slate-100 text-sm font-semibold text-slate-600">
+                            {(user.nickname || user.email).charAt(0)}
+                          </div>
+                        )}
+                        <div className="min-w-0">
+                          <div className="truncate font-semibold text-slate-900">{user.nickname || user.email.split('@')[0]}</div>
+                          <div className="truncate text-xs text-slate-600" dir="ltr">{user.email}</div>
+                        </div>
+                      </div>
+                    </td>
+                    <td className={td}>
+                      <label htmlFor={`role-${user.id}`} className="sr-only">دور {user.email}</label>
+                      <select
+                        id={`role-${user.id}`}
+                        value={user.role}
+                        onChange={(e) => handleUpdateRole(user.id, e.target.value as Role)}
+                        className={inputClass + ' py-1.5'}
+                      >
+                        <option value="ADMIN">{roleLabels.ADMIN}</option>
+                        <option value="MANAGER">{roleLabels.MANAGER}</option>
+                        <option value="CLIENT">{roleLabels.CLIENT}</option>
+                      </select>
+                    </td>
+                    <td className={td}>
+                      {user.role === 'ADMIN' ? (
+                        <span className="text-slate-600">كل الوحدات</span>
+                      ) : (
+                        <div className="flex flex-wrap gap-1.5">
+                          {locations.map(loc => {
+                            const hasAccess = !!user.locationIds?.includes(loc.id);
+                            return (
+                              <button
+                                key={loc.id}
+                                aria-pressed={hasAccess}
+                                onClick={() => handleToggleLocationAccess(user, loc.id)}
+                                className={chipClass(hasAccess)}
+                              >
+                                {loc.name}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </td>
+                    <td className={td + ' text-left'}>
+                      <button
+                        onClick={() => handleDeleteUser(user)}
+                        className={iconButtonClass('danger')}
+                        aria-label={`حذف ${user.email}`}
+                      >
+                        <Trash2 className="h-4 w-4" strokeWidth={1.75} />
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
+      </Card>
     </div>
   );
 };

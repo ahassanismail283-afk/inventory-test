@@ -1,140 +1,118 @@
 import React, { useState, useMemo } from 'react';
 import { useInventory } from '../../hooks/useInventory';
-import { Printer, CalendarDays } from 'lucide-react';
-import { format, startOfWeek, isWithinInterval, parseISO } from 'date-fns';
+import { Printer, CalendarRange, FileText } from 'lucide-react';
+import { displayDay, summarizePeriod } from '../../lib/periods';
+import { Card, EmptyState, Field, PageHeader, buttonClass, inputClass } from '../ui';
 import { useAuth } from '../../contexts/AuthContext';
 
 const MonthlyReport: React.FC = () => {
   const { items, transactions } = useInventory();
   const { locations, activeLocationId } = useAuth();
   
-  // Default to the first day of current month and today
-  const today = new Date();
-  const firstDay = new Date(today.getFullYear(), today.getMonth(), 1);
-  
-  const [startDateInput, setStartDateInput] = useState(format(firstDay, 'yyyy-MM-dd'));
-  const [endDateInput, setEndDateInput] = useState(format(today, 'yyyy-MM-dd'));
+  // The custody month (first Wednesday → last Tuesday) varies, so both dates are always
+  // entered manually and used exactly as given.
+  const [startDateInput, setStartDateInput] = useState('');
+  const [endDateInput, setEndDateInput] = useState('');
 
-  // Calculate Tuesday boundaries
-  const startDate = startOfWeek(parseISO(startDateInput), { weekStartsOn: 2 }); // Tuesday
-  const endDate = startOfWeek(parseISO(endDateInput), { weekStartsOn: 2 }); // Tuesday
+  const hasValidRange = !!startDateInput && !!endDateInput && startDateInput <= endDateInput;
 
   const activeLocation = locations.find(l => l.id === activeLocationId);
 
+  // Items that were in stock at period end or consumed during it
   const reportData = useMemo(() => {
-    // 1. Filter consumptions in date range
-    const periodConsumptions = transactions.filter(t => {
-      const txDate = parseISO(t.date);
-      return t.type === 'استهلاك' && isWithinInterval(txDate, { start: startDate, end: endDate });
-    });
-
-    // 2. Sum by item Id
-    const consumptionMap: Record<string, number> = {};
-    periodConsumptions.forEach(t => {
-      consumptionMap[t.itemId] = (consumptionMap[t.itemId] || 0) + t.quantity;
-    });
-
-    // 3. Map to items and filter
-    const report = items
-      .filter(item => item.currentQuantity > 0 || consumptionMap[item.id] > 0)
-      .map(item => ({
-        id: item.id,
-        name: item.name,
-        currentStock: item.currentQuantity,
-        consumption: consumptionMap[item.id] || 0
-      }));
-
-    return report;
-  }, [items, transactions, startDate, endDate]);
+    if (!hasValidRange) return [];
+    return summarizePeriod(items, transactions, startDateInput, endDateInput)
+      .filter(row => row.closingBalance > 0 || row.consumption > 0);
+  }, [items, transactions, startDateInput, endDateInput, hasValidRange]);
 
   const handlePrint = () => {
     window.print();
   };
 
   return (
-    <div className="mx-auto max-w-4xl p-6 print:max-w-none print:p-0">
-      
+    <div className="print:max-w-none">
+      <PageHeader
+        title="تقرير شهري"
+        description="المنصرف والرصيد المتبقي من أول أربعاء إلى آخر ثلاثاء في شهر العهدة."
+      />
+
       {/* Controls - Hidden in print */}
-      <div className="mb-8 flex flex-col sm:flex-row sm:items-end justify-between gap-4 no-print bg-white/70 backdrop-blur-xl p-6 rounded-2xl border border-white/40 shadow-[0_8px_30px_rgb(0,0,0,0.04)]">
-        <div className="flex flex-col gap-4 w-full sm:w-auto">
-          <div className="flex items-center gap-3">
-            <div className="rounded-xl bg-primary-50/50 p-2 text-primary-600 shadow-sm backdrop-blur-sm">
-              <CalendarDays className="h-6 w-6" />
-            </div>
-            <div>
-              <h2 className="text-xl font-bold text-slate-800 font-serif tracking-tight">التقرير الشهري (جرد الرصيد)</h2>
-              <p className="text-sm text-slate-500 mt-1">يعرض المنصرف والرصيد لفترة مخصصة (يتم ضبطها ليوم الثلاثاء)</p>
-            </div>
-          </div>
-          
-          <div className="flex items-center gap-4 mt-2">
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">من (أي يوم)</label>
+      <Card className="mb-4 no-print">
+        <div className="flex flex-col gap-4 p-4 sm:flex-row sm:items-end sm:justify-between">
+          <div className="grid gap-4 sm:grid-cols-2">
+            <Field label="من (أول أربعاء)" htmlFor="month-start">
               <input
+                id="month-start"
                 type="date"
                 value={startDateInput}
                 onChange={(e) => setStartDateInput(e.target.value)}
-                className="block w-full rounded-xl border-0 py-2.5 px-4 text-slate-900 ring-1 ring-inset ring-slate-200 focus:ring-2 focus:ring-primary-600 bg-primary-50 focus:bg-white shadow-sm"
+                className={inputClass}
               />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">إلى (أي يوم)</label>
+            </Field>
+            <Field label="إلى (آخر ثلاثاء)" htmlFor="month-end">
               <input
+                id="month-end"
                 type="date"
                 value={endDateInput}
                 onChange={(e) => setEndDateInput(e.target.value)}
-                className="block w-full rounded-xl border-0 py-2.5 px-4 text-slate-900 ring-1 ring-inset ring-slate-200 focus:ring-2 focus:ring-primary-600 bg-white/50 shadow-sm"
+                className={inputClass}
               />
-            </div>
+            </Field>
           </div>
+          <button onClick={handlePrint} className={buttonClass('primary')} disabled={reportData.length === 0}>
+            <Printer className="h-4 w-4" strokeWidth={1.75} />
+            طباعة الكشف
+          </button>
         </div>
-
-        <button
-          onClick={handlePrint}
-          className="flex items-center justify-center gap-2 rounded-xl bg-gradient-to-l from-slate-800 to-slate-900 px-6 py-2.5 font-semibold text-white hover:shadow-lg transition-all w-full sm:w-auto h-fit"
-        >
-          <Printer className="h-5 w-5" />
-          طباعة التقرير
-        </button>
-      </div>
+      </Card>
 
       {/* Printable Report Area */}
-      <div className="bg-white/80 backdrop-blur-xl p-0 sm:p-8 rounded-none sm:rounded-2xl sm:border border-white/40 shadow-[0_8px_30px_rgb(0,0,0,0.04)] print:p-0 print:border-none print:shadow-none print:bg-transparent print:overflow-visible">
-        
+      <div className="rounded-xl border border-slate-200 bg-white p-5 sm:p-8 print:rounded-none print:border-none print:p-0">
+
         {/* Official Header */}
-        <div className="mb-8 border-b-2 border-slate-900 pb-6 text-center text-slate-900">
-          <h1 className="text-2xl font-bold mb-2">{activeLocation?.name || '---'}</h1>
-          <h2 className="text-xl font-semibold mb-4">كشف جرد عهدة الأدوية</h2>
-          <div className="flex justify-between items-center text-sm font-medium mt-4">
-             <div>الجهة: {activeLocation?.name || '---'}</div>
-             <div dir="ltr">
-               {format(startDate, 'dd/MM/yyyy')} - {format(endDate, 'dd/MM/yyyy')}
-             </div>
+        <div className="mb-6 border-b-2 border-slate-900 pb-5 text-center text-slate-900">
+          <p className="text-lg font-bold">{activeLocation?.name || '---'}</p>
+          <h2 className="mt-1 text-xl font-bold">كشف جرد عهدة الأدوية</h2>
+          <div className="mt-4 flex items-center justify-between text-sm font-medium">
+            <div>الجهة: {activeLocation?.name || '---'}</div>
+            <div dir="ltr" className="tabular-nums">
+              {hasValidRange ? `${displayDay(startDateInput)} - ${displayDay(endDateInput)}` : '---'}
+            </div>
           </div>
         </div>
 
         <div className="overflow-x-auto print:overflow-visible">
-          {reportData.length === 0 ? (
-             <div className="text-center py-8 text-slate-500 no-print">لا توجد بيانات لهذه الفترة.</div>
+          {!hasValidRange ? (
+            <div className="no-print">
+              <EmptyState
+                icon={CalendarRange}
+                title={startDateInput && endDateInput ? 'تاريخ البداية بعد تاريخ النهاية' : 'حدد فترة شهر العهدة'}
+                hint={startDateInput && endDateInput ? 'صحّح التاريخين ليظهر الكشف.' : 'اختر أول أربعاء وآخر ثلاثاء في الشهر ليظهر الكشف.'}
+              />
+            </div>
+          ) : reportData.length === 0 ? (
+            <div className="no-print">
+              <EmptyState icon={FileText} title="لا توجد بيانات لهذه الفترة" />
+            </div>
           ) : (
-            <table className="w-full text-right border-collapse border border-slate-300">
+            <table className="w-full border-collapse border border-slate-300 text-right">
               <thead>
-                <tr className="bg-slate-100/80 text-sm text-slate-900 print:bg-slate-100">
-                  <th className="border border-slate-300 py-3 px-4 font-bold w-12 text-center">م</th>
-                  <th className="border border-slate-300 py-3 px-4 font-bold">اسم الصنف</th>
-                  <th className="border border-slate-300 py-3 px-4 font-bold text-center w-32">المنصرف</th>
-                  <th className="border border-slate-300 py-3 px-4 font-bold text-center w-40">الرصيد الدفتري والفِعلي</th>
-                  <th className="border border-slate-300 py-3 px-4 font-bold w-32">ملاحظات</th>
+                <tr className="bg-slate-100 text-sm text-slate-900">
+                  <th className="w-12 border border-slate-300 px-4 py-3 text-center font-bold">م</th>
+                  <th className="border border-slate-300 px-4 py-3 font-bold">اسم الصنف</th>
+                  <th className="w-32 border border-slate-300 px-4 py-3 text-center font-bold">المنصرف</th>
+                  <th className="w-40 border border-slate-300 px-4 py-3 text-center font-bold">الرصيد الدفتري والفِعلي</th>
+                  <th className="w-32 border border-slate-300 px-4 py-3 font-bold">ملاحظات</th>
                 </tr>
               </thead>
-              <tbody className="text-slate-900 text-sm">
+              <tbody className="text-sm text-slate-900">
                 {reportData.map((row, index) => (
                   <tr key={row.id}>
-                    <td className="border border-slate-300 py-2 px-4 text-center">{index + 1}</td>
-                    <td className="border border-slate-300 py-2 px-4 font-medium">{row.name}</td>
-                    <td className="border border-slate-300 py-2 px-4 text-center font-semibold">{row.consumption}</td>
-                    <td className="border border-slate-300 py-2 px-4 text-center font-bold">{row.currentStock}</td>
-                    <td className="border border-slate-300 py-2 px-4"></td>
+                    <td className="border border-slate-300 px-4 py-2 text-center tabular-nums">{index + 1}</td>
+                    <td className="border border-slate-300 px-4 py-2 font-medium">{row.name}</td>
+                    <td className="border border-slate-300 px-4 py-2 text-center font-semibold tabular-nums">{row.consumption}</td>
+                    <td className="border border-slate-300 px-4 py-2 text-center font-bold tabular-nums">{row.closingBalance}</td>
+                    <td className="border border-slate-300 px-4 py-2"></td>
                   </tr>
                 ))}
               </tbody>
@@ -143,7 +121,7 @@ const MonthlyReport: React.FC = () => {
         </div>
 
         {/* Footer Signatures */}
-        <div className="mt-16 grid grid-cols-3 gap-4 text-center text-sm font-bold text-slate-900 border-t border-slate-200 pt-8 mt-auto page-break-inside-avoid">
+        <div className="page-break-inside-avoid mt-16 grid grid-cols-3 gap-4 border-t border-slate-200 pt-8 text-center text-sm font-bold text-slate-900">
           <div>أمين العهدة<br/><br/>...................</div>
           <div>لجنة الجرد<br/><br/>...................</div>
           <div>يعتمد، مدير الوحدة<br/><br/>...................</div>

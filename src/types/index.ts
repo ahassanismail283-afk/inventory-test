@@ -38,6 +38,16 @@ export interface Transaction {
   createdAt: string;
 }
 
+// A dated record that the unit's custody was checked and matched on that day
+export interface Reconciliation {
+  id: string;
+  locationId: string;
+  date: string;
+  note: string | null;
+  createdBy: string | null;
+  createdat: string;
+}
+
 // Supabase Database type generated structure (mocked)
 export interface Database {
   public: {
@@ -46,6 +56,7 @@ export interface Database {
       locations: { Row: Location; Insert: any; Update: any };
       items: { Row: Item; Insert: any; Update: any };
       transactions: { Row: Transaction; Insert: any; Update: any };
+      reconciliations: { Row: Reconciliation; Insert: any; Update: any };
     };
   };
 }
